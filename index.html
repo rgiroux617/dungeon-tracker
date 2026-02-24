@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>DungeonTracker Demo (50x50)</title>
+  <link rel="stylesheet" href="./dungeontracker.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="left">
+      <div id="wrap">
+        <svg id="dungeonGrid"></svg>
+      </div>
+    </div>
+
+    <div id="panel">
+      <h1 id="dtTitle">DungeonTracker</h1>
+      <div class="small">
+        Click a tile to edit it.<br/>
+        Stage tiles with <kbd>Shift</kbd>+Click, then <kbd>Enter</kbd> or "Create Room".<br/>
+        Rooms must be edge-contiguous.
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="chip" id="dtMode">Editing: Cell</div>
+      <div class="chip" id="dtSelected">Click a tile…</div>
+
+      <label>Color</label>
+      <input id="dtColor" type="color" value="#2a2a2a" />
+
+      <label>Icon (single char / emoji)</label>
+      <input id="dtIcon" type="text" maxlength="2" placeholder="e.g. ⚔︎" />
+
+      <label>Notes</label>
+      <textarea id="dtNotes" placeholder="What’s here? Doors, traps, factions…"></textarea>
+
+      <div class="hr"></div>
+
+      <label>Room name</label>
+      <input id="dtRoomName" type="text" placeholder="(auto)" />
+
+      <label>Room kind</label>
+      <select id="dtRoomKind">
+        <option value="room">room</option>
+        <option value="hall">hall</option>
+        <option value="chamber">chamber</option>
+        <option value="stairs">stairs</option>
+        <option value="boss">boss</option>
+        <option value="secret">secret</option>
+      </select>
+
+      <div class="row">
+        <button id="dtCreateRoom" type="button">Create Room</button>
+        <button id="dtClearCell" type="button">Clear Cell</button>
+      </div>
+      <div class="row">
+        <button id="dtDissolveRoom" type="button">Dissolve Room</button>
+        <button id="dtDeleteRoom" type="button">Delete Room</button>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="row">
+        <button id="dtExport" type="button">Export</button>
+        <button id="dtImport" type="button">Import</button>
+        <button id="dtWipe" type="button">Wipe</button>
+        <input id="dtImportFile" type="file" accept="application/json" style="display:none;" />
+      </div>
+
+      <div class="hr"></div>
+      <div class="small">Rooms</div>
+      <div id="dtRoomList"></div>
+    </div>
+  </div>
+
+<script type="module">
+  import { createDungeonTracker } from "./dungeontracker.js";
+
+  window.addEventListener("DOMContentLoaded", () => {
+    const svgEl = document.getElementById("dungeonGrid");
+
+    const panelEls = {
+      titleEl: document.getElementById("dtTitle"),
+      modeEl: document.getElementById("dtMode"),
+      selectedEl: document.getElementById("dtSelected"),
+      colorEl: document.getElementById("dtColor"),
+      iconEl: document.getElementById("dtIcon"),
+      notesEl: document.getElementById("dtNotes"),
+      roomNameEl: document.getElementById("dtRoomName"),
+      roomKindEl: document.getElementById("dtRoomKind"),
+      createRoomBtn: document.getElementById("dtCreateRoom"),
+      dissolveRoomBtn: document.getElementById("dtDissolveRoom"),
+      deleteRoomBtn: document.getElementById("dtDeleteRoom"),
+      clearCellBtn: document.getElementById("dtClearCell"),
+      exportBtn: document.getElementById("dtExport"),
+      importBtn: document.getElementById("dtImport"),
+      importFileEl: document.getElementById("dtImportFile"),
+      wipeBtn: document.getElementById("dtWipe"),
+      roomListEl: document.getElementById("dtRoomList"),
+      exitBtn: null
+    };
+
+    createDungeonTracker({
+      svgEl,
+      panelEls,
+      storageKey: "dungeontracker_demo_50x50",
+      COLS: 50,
+      ROWS: 50,
+      SIZE: 18,
+      GAP: 2,
+      PAD: 18,
+    });
+  });
+</script>
+</body>
+</html>
