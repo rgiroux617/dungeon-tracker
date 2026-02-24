@@ -210,7 +210,8 @@ export function createDungeonTracker(opts){
   function onPointerDown(e) {
     // Only handle touch/pen for map gestures; mouse can keep normal scroll behavior if you like.
     // If you want mouse-drag pan too, delete this if-block.
-    if (e.pointerType === "mouse") return;
+    e.preventDefault();
+    // if (e.pointerType === "mouse") return;
 
     svgEl.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -238,6 +239,7 @@ export function createDungeonTracker(opts){
   }
 
   function onPointerMove(e) {
+    e.preventDefault();
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -308,11 +310,83 @@ export function createDungeonTracker(opts){
     }
   }
 
-  svgEl.addEventListener("pointerdown", onPointerDown, { passive: true });
-  svgEl.addEventListener("pointermove", onPointerMove, { passive: true });
-  svgEl.addEventListener("pointerup", onPointerUp, { passive: true });
-  svgEl.addEventListener("pointercancel", onPointerUp, { passive: true });
+  svgEl.addEventListener("pointerdown", onPointerDown, { passive: false });
+  svgEl.addEventListener("pointermove", onPointerMove, { passive: false });
+  svgEl.addEventListener("pointerup", onPointerUp, { passive: false });
+  svgEl.addEventListener("pointercancel", onPointerUp, { passive: false });
 
+  // --- Touch Events fallback (for iOS cases where Pointer Events don't fire) ---
+  let t0 = null; // { mode:"pan"|"pinch", startView, p1, p2, startDist, startMidSvg }
+
+  function getTouches(e) {
+    const ts = Array.from(e.touches).map(t => ({ id: t.identifier, x: t.clientX, y: t.clientY }));
+    return ts;
+  }
+
+  svgEl.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    const ts = getTouches(e);
+    if (ts.length === 1) {
+      t0 = { mode: "pan", startView: { ...view }, p1: ts[0] };
+    } else if (ts.length === 2) {
+      const m = mid(ts[0], ts[1]);
+      const d = dist(ts[0], ts[1]);
+      t0 = {
+        mode: "pinch",
+        startView: { ...view },
+        startDist: d,
+        startMidSvg: clientToSvg(m.x, m.y)
+      };
+    }
+  }, { passive: false });
+
+  svgEl.addEventListener("touchmove", (e) => {
+    e.preventDefault();
+    if (!t0) return;
+    const ts = getTouches(e);
+
+    if (t0.mode === "pan" && ts.length === 1) {
+      const dxPx = ts[0].x - t0.p1.x;
+      const dyPx = ts[0].y - t0.p1.y;
+      if (Math.hypot(dxPx, dyPx) > 6) blockClicks(300);
+
+      const { ux, uy } = svgUnitsPerPx();
+      view.x = t0.startView.x - dxPx * ux;
+      view.y = t0.startView.y - dyPx * uy;
+      updateView();
+    }
+
+    if (t0.mode === "pinch" && ts.length === 2) {
+      blockClicks(400);
+      const m = mid(ts[0], ts[1]);
+      const d = dist(ts[0], ts[1]);
+
+      const scale = t0.startDist / Math.max(1, d);
+      view.w = clamp(t0.startView.w * scale, vbMaxW, vbMinW);
+      view.h = clamp(t0.startView.h * scale, vbMaxH, vbMinH);
+
+      const rect = svgEl.getBoundingClientRect();
+      const midPxX = m.x - rect.left;
+      const midPxY = m.y - rect.top;
+
+      view.x = t0.startMidSvg.x - (midPxX / Math.max(1, rect.width)) * view.w;
+      view.y = t0.startMidSvg.y - (midPxY / Math.max(1, rect.height)) * view.h;
+
+      updateView();
+    }
+  }, { passive: false });
+
+  svgEl.addEventListener("touchend", (e) => {
+    e.preventDefault();
+    const ts = getTouches(e);
+    if (ts.length === 0) t0 = null;
+    if (ts.length === 1) t0 = { mode: "pan", startView: { ...view }, p1: ts[0] };
+  }, { passive: false });
+
+  svgEl.addEventListener("touchcancel", (e) => {
+    e.preventDefault();
+    t0 = null;
+  }, { passive: false });
 
   function rectForKey(k){ return grid.rectByKey.get(k) || null; }
 
