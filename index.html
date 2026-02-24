@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1, user-scalable=no" />
   <title>DungeonTracker Demo (50x50)</title>
   <link rel="stylesheet" href="./dungeontracker.css" />
 </head>
@@ -10,7 +10,9 @@
   <div id="app">
     <div id="left">
       <div id="wrap">
-        <svg id="dungeonGrid"></svg>
+        <div id="mapViewport">
+          <svg id="dungeonGrid"></svg>
+        </div>
       </div>
     </div>
 
