@@ -1,4 +1,4 @@
-// dungeontracker.js v2026-02-24-01
+// dungeontracker.js v2026-02-24-03
 // A self-contained "DungeonTracker" you can mount into an existing page.
 // - Left side: SVG 50x50 square grid.
 // - Right side: panel to edit either a cell OR a room.
@@ -74,6 +74,8 @@ export function createDungeonTracker(opts){
   // multi-select staging for "create room"
   const staged = new Set(); // keys
   let hoverKey = null;
+  // “Group mode” (iPad-friendly multi-select): when ON, tapping tiles stages them
+  let groupMode = false;
 
   // --- geometry + build ---
   const math = makeSquareMath({ COLS, ROWS, SIZE, GAP, PAD });
@@ -274,24 +276,9 @@ export function createDungeonTracker(opts){
     if (!t0) return;
     const ts = getTouches(e);
 
-    // once we’re actually panning/zooming, stop page from handling it
-    e.preventDefault();
-
-    if (t0.mode === "pan" && ts.length === 1) {
-      const dxPx = ts[0].x - t0.p1.x;
-      const dyPx = ts[0].y - t0.p1.y;
-
-      if (Math.hypot(dxPx, dyPx) > 6) {
-        blockClicks(350);
-      }
-
-      const { ux, uy } = svgUnitsPerPx();
-      view.x = t0.startView.x - dxPx * ux;
-      view.y = t0.startView.y - dyPx * uy;
-      updateView();
-    }
-
+    // PINCH: always preventDefault
     if (t0.mode === "pinch" && ts.length === 2) {
+      e.preventDefault();
       blockClicks(450);
 
       const m = mid(ts[0], ts[1]);
@@ -308,6 +295,25 @@ export function createDungeonTracker(opts){
       view.x = t0.startMidSvg.x - (midPxX / Math.max(1, rect.width)) * view.w;
       view.y = t0.startMidSvg.y - (midPxY / Math.max(1, rect.height)) * view.h;
 
+      updateView();
+      return;
+    }
+
+    // PAN: only preventDefault AFTER we exceed a move threshold
+    if (t0.mode === "pan" && ts.length === 1) {
+      const dxPx = ts[0].x - t0.p1.x;
+      const dyPx = ts[0].y - t0.p1.y;
+      const moved = Math.hypot(dxPx, dyPx);
+
+      // If it’s basically a tap, do nothing (lets iOS generate the click)
+      if (moved < 8) return;
+
+      e.preventDefault();
+      blockClicks(350);
+
+      const { ux, uy } = svgUnitsPerPx();
+      view.x = t0.startView.x - dxPx * ux;
+      view.y = t0.startView.y - dyPx * uy;
       updateView();
     }
   }, { passive: false });
@@ -329,11 +335,19 @@ export function createDungeonTracker(opts){
   // Keyboard:
   //   - Esc clears staging (and closes room edit back to cell)
   //   - Enter creates room if staging is valid
-  function onCellClick(c, r, rect){
+  function onCellClick(c, r, rect) {
     if (Date.now() < blockClicksUntil) return;
+
     const k = key(c, r);
 
-    if (window.event?.shiftKey){
+    // If grouping is ON, tap toggles staging (iPad-friendly)
+    if (groupMode) {
+      toggleStage(k);
+      return;
+    }
+
+    // Desktop shortcut still supported
+    if (window.event?.shiftKey) {
       toggleStage(k);
       return;
     }
@@ -379,6 +393,18 @@ export function createDungeonTracker(opts){
       setVisual(rect, c, r);
     }
     staged.clear();
+    renderStageStatus();
+  }
+
+  function enterGroupMode() {
+    groupMode = true;
+    clearStage();          // start clean
+    renderStageStatus();   // updates button label/disabled
+  }
+
+  function exitGroupMode() {
+    groupMode = false;
+    clearStage();
     renderStageStatus();
   }
 
@@ -506,6 +532,9 @@ export function createDungeonTracker(opts){
     selectedEl.textContent = `Room: ${room.name} (${room.cells.length} tiles)`;
     refreshButtons();
     renderRoomList();
+
+    groupMode = false;
+    renderStageStatus();
   }
 
   function dissolveRoom(roomId){
@@ -679,6 +708,7 @@ export function createDungeonTracker(opts){
         <div class="meta">${escapeHtml(room.kind)} • ${room.cells.length} tiles</div>
       `;
       div.addEventListener("click", () => {
+        if (groupMode) return;
         // select first cell of that room
         const k = room.cells[0];
         const rect = rectForKey(k);
@@ -704,17 +734,32 @@ export function createDungeonTracker(opts){
   }
 
   // --- stage status / buttons ---
-  function renderStageStatus(){
+  function renderStageStatus() {
     const n = staged.size;
     const contiguous = n ? isContiguous(Array.from(staged)) : true;
 
     titleEl.textContent = "DungeonTracker";
+
+    // Button behavior:
+    // - groupMode OFF: button says "Group" and is enabled
+    // - groupMode ON + 0 tiles: button says "Cancel Group" and is enabled
+    // - groupMode ON + tiles: button says "Create Room" and is enabled only if contiguous
+    if (!groupMode) {
+      createRoomBtn.textContent = "Group";
+      createRoomBtn.disabled = false;
+    } else if (n === 0) {
+      createRoomBtn.textContent = "Cancel Group";
+      createRoomBtn.disabled = false;
+    } else {
+      createRoomBtn.textContent = "Create Room";
+      createRoomBtn.disabled = !contiguous;
+    }
+
+    // (optional debug message you had)
     const msg = n
       ? `Staged tiles: ${n} • ${contiguous ? "contiguous ✅" : "not contiguous ❌"}`
       : "Staged tiles: 0";
-    selectedEl.dataset.stage = msg; // not shown; just for debug
-
-    createRoomBtn.disabled = !(n && contiguous);
+    selectedEl.dataset.stage = msg;
   }
 
   function refreshButtons(){
@@ -802,7 +847,23 @@ export function createDungeonTracker(opts){
   roomNameEl.addEventListener("input", () => applyRoomName(roomNameEl.value));
   roomKindEl.addEventListener("change", () => applyRoomKind(roomKindEl.value));
 
-  createRoomBtn.addEventListener("click", () => createRoomFromStage());
+  createRoomBtn.addEventListener("click", () => {
+    // If not in group mode, this button ENTERS group mode
+    if (!groupMode) {
+      enterGroupMode();
+      return;
+    }
+
+    // In group mode:
+    // - if no tiles staged, it CANCELS group mode
+    if (staged.size === 0) {
+      exitGroupMode();
+      return;
+    }
+
+    // - otherwise, it tries to create the room
+    createRoomFromStage();
+  });
   dissolveRoomBtn.addEventListener("click", () => {
     const room = getCurrentRoom();
     if (!room) return;
@@ -832,6 +893,11 @@ export function createDungeonTracker(opts){
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape"){
       clearStage();
+      if (groupMode) {
+        // If you hit Esc with nothing staged, treat it as leaving group mode
+        if (staged.size === 0) groupMode = false;
+        renderStageStatus();
+      }
       // if you were editing a room, Esc flips back to cell edit (keeping selection)
       if (editTarget === "room"){
         editTarget = "cell";
