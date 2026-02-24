@@ -15,13 +15,9 @@ html, body{ height:100%; margin:0; font-family: system-ui, -apple-system, Segoe 
 }
 
 #wrap{ padding:16px; }
-#dungeonGrid{ display:block; border-radius:16px; background: rgba(0,0,0,0.15); }
+#dungeonGrid{ display:block; border-radius:16px; background: rgba(0,0,0,0.15); touch-action: none; }
 
-/* Touch: let our JS handle pan/zoom inside the SVG */
-#dungeonGrid {
-  touch-action: none;
-  /* critical for pointer-based pinch/pan */
-}
+
 
 /* On iPad/phones, prevent the left pane from scrolling while panning the map */
 @media (hover: none) and (pointer: coarse) {

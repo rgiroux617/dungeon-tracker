@@ -1,4 +1,4 @@
-// dungeontracker.js v2026-02-23-01
+// dungeontracker.js v2026-02-24-01
 // A self-contained "DungeonTracker" you can mount into an existing page.
 // - Left side: SVG 50x50 square grid.
 // - Right side: panel to edit either a cell OR a room.
@@ -143,12 +143,11 @@ export function createDungeonTracker(opts){
     makeIconText: true
   });
 
-  // --- pan + pinch-zoom (iPad friendly) via viewBox ---
-  // Uses Pointer Events + touch-action:none (CSS) so the browser doesn't zoom the page.
-  const vbMinW = grid.w;           // zoomed-out limit (full map)
+  // --- pan + pinch-zoom via viewBox (safe with tile clicks) ---
+  const vbMinW = grid.w;
   const vbMinH = grid.h;
-  const maxZoom = 8;               // zoom-in limit (8x)
-  const vbMaxW = grid.w / maxZoom; // smallest viewBox allowed
+  const maxZoom = 8;
+  const vbMaxW = grid.w / maxZoom;
   const vbMaxH = grid.h / maxZoom;
 
   let view = { x: 0, y: 0, w: grid.w, h: grid.h };
@@ -156,7 +155,6 @@ export function createDungeonTracker(opts){
 
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
-  // keep viewBox inside the map bounds
   function clampView() {
     view.w = clamp(view.w, vbMaxW, vbMinW);
     view.h = clamp(view.h, vbMaxH, vbMinH);
@@ -177,25 +175,12 @@ export function createDungeonTracker(opts){
     };
   }
 
-  function dist(a, b) {
-    const dx = a.x - b.x, dy = a.y - b.y;
-    return Math.hypot(dx, dy);
-  }
+  function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+  function mid(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
 
-  function mid(a, b) {
-    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-  }
-
-  // suppress tile clicks after a drag/pinch (prevents accidental selection)
+  // suppress tile clicks after a drag/pinch
   let blockClicksUntil = 0;
-  function blockClicks(ms = 250) {
-    blockClicksUntil = Date.now() + ms;
-  }
-
-  // Track active pointers
-  const pointers = new Map(); // id -> {x,y}
-  let gesture = null;
-  // gesture: { mode:"pan"|"pinch", startView, startDist, startMid, startMidSvg }
+  function blockClicks(ms = 250) { blockClicksUntil = Date.now() + ms; }
 
   function clientToSvg(clientX, clientY) {
     const rect = svgEl.getBoundingClientRect();
@@ -207,148 +192,98 @@ export function createDungeonTracker(opts){
     };
   }
 
-  function onPointerDown(e) {
-    // Only handle touch/pen for map gestures; mouse can keep normal scroll behavior if you like.
-    // If you want mouse-drag pan too, delete this if-block.
+  /* =========================
+     Desktop: wheel zoom
+     ========================= */
+  svgEl.addEventListener("wheel", (e) => {
+    // zoom around mouse pointer
     e.preventDefault();
-    // if (e.pointerType === "mouse") return;
+    blockClicks(150);
 
-    svgEl.setPointerCapture(e.pointerId);
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const zoomFactor = (e.deltaY > 0) ? 1.12 : 0.89; // scroll down => zoom out
+    const p = clientToSvg(e.clientX, e.clientY);
 
-    if (pointers.size === 1) {
-      gesture = {
-        mode: "pan",
-        startView: { ...view },
-        startPt: { x: e.clientX, y: e.clientY }
-      };
-    } else if (pointers.size === 2) {
-      const pts = Array.from(pointers.values());
-      const m = mid(pts[0], pts[1]);
-      const d = dist(pts[0], pts[1]);
-      const mSvg = clientToSvg(m.x, m.y);
+    const newW = clamp(view.w * zoomFactor, vbMaxW, vbMinW);
+    const newH = clamp(view.h * zoomFactor, vbMaxH, vbMinH);
 
-      gesture = {
-        mode: "pinch",
-        startView: { ...view },
-        startDist: d,
-        startMid: m,
-        startMidSvg: mSvg
-      };
-    }
-  }
+    const rx = (p.x - view.x) / view.w;
+    const ry = (p.y - view.y) / view.h;
 
-  function onPointerMove(e) {
-    e.preventDefault();
-    if (!pointers.has(e.pointerId)) return;
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    view.x = p.x - rx * newW;
+    view.y = p.y - ry * newH;
+    view.w = newW;
+    view.h = newH;
 
-    if (!gesture) return;
+    updateView();
+  }, { passive: false });
 
-    // PAN (1 pointer)
-    if (pointers.size === 1 && gesture.mode === "pan") {
-      const cur = pointers.get(e.pointerId);
-      const dxPx = cur.x - gesture.startPt.x;
-      const dyPx = cur.y - gesture.startPt.y;
+  /* =========================
+     Desktop: right-drag pan
+     ========================= */
+  svgEl.addEventListener("contextmenu", (e) => e.preventDefault());
 
-      // if user is really moving, block clicks
-      if (Math.hypot(dxPx, dyPx) > 6) blockClicks(300);
-
-      const { ux, uy } = svgUnitsPerPx();
-      view.x = gesture.startView.x - dxPx * ux;
-      view.y = gesture.startView.y - dyPx * uy;
-      updateView();
+  let mousePan = null; // { startView, startPt }
+  svgEl.addEventListener("pointerdown", (e) => {
+    // IMPORTANT: do NOT steal left-click (tile selection)
+    if (e.pointerType === "mouse") {
+      if (e.button !== 2) return; // only right button pans
+      e.preventDefault();
+      blockClicks(200);
+      mousePan = { startView: { ...view }, startPt: { x: e.clientX, y: e.clientY } };
       return;
-    }
-
-    // PINCH (2 pointers)
-    if (pointers.size === 2) {
-      const pts = Array.from(pointers.values());
-      const m = mid(pts[0], pts[1]);
-      const d = dist(pts[0], pts[1]);
-
-      // if pinch is happening, block clicks
-      blockClicks(400);
-
-      // scale relative to start
-      const scale = gesture.startDist / Math.max(1, d); // pinch out -> smaller d? (scale up)
-      const targetW = gesture.startView.w * scale;
-      const targetH = gesture.startView.h * scale;
-
-      // clamp zoom limits
-      view.w = clamp(targetW, vbMaxW, vbMinW);
-      view.h = clamp(targetH, vbMaxH, vbMinH);
-
-      // Keep zoom centered at the pinch midpoint (in SVG units)
-      // We stored the midpoint in SVG coords at gesture start; keep that same world point under the fingers.
-      const rect = svgEl.getBoundingClientRect();
-      const midPxX = m.x - rect.left;
-      const midPxY = m.y - rect.top;
-
-      view.x = gesture.startMidSvg.x - (midPxX / Math.max(1, rect.width)) * view.w;
-      view.y = gesture.startMidSvg.y - (midPxY / Math.max(1, rect.height)) * view.h;
-
-      updateView();
-    }
-  }
-
-  function onPointerUp(e) {
-    pointers.delete(e.pointerId);
-    if (pointers.size === 0) {
-      gesture = null;
-      return;
-    }
-
-    // If one pointer remains after pinch, reset gesture to pan from current state
-    if (pointers.size === 1) {
-      const only = Array.from(pointers.values())[0];
-      gesture = {
-        mode: "pan",
-        startView: { ...view },
-        startPt: { x: only.x, y: only.y }
-      };
-    }
-  }
-
-  svgEl.addEventListener("pointerdown", onPointerDown, { passive: false });
-  svgEl.addEventListener("pointermove", onPointerMove, { passive: false });
-  svgEl.addEventListener("pointerup", onPointerUp, { passive: false });
-  svgEl.addEventListener("pointercancel", onPointerUp, { passive: false });
-
-  // --- Touch Events fallback (for iOS cases where Pointer Events don't fire) ---
-  let t0 = null; // { mode:"pan"|"pinch", startView, p1, p2, startDist, startMidSvg }
-
-  function getTouches(e) {
-    const ts = Array.from(e.touches).map(t => ({ id: t.identifier, x: t.clientX, y: t.clientY }));
-    return ts;
-  }
-
-  svgEl.addEventListener("touchstart", (e) => {
-    e.preventDefault();
-    const ts = getTouches(e);
-    if (ts.length === 1) {
-      t0 = { mode: "pan", startView: { ...view }, p1: ts[0] };
-    } else if (ts.length === 2) {
-      const m = mid(ts[0], ts[1]);
-      const d = dist(ts[0], ts[1]);
-      t0 = {
-        mode: "pinch",
-        startView: { ...view },
-        startDist: d,
-        startMidSvg: clientToSvg(m.x, m.y)
-      };
     }
   }, { passive: false });
 
-  svgEl.addEventListener("touchmove", (e) => {
+  svgEl.addEventListener("pointermove", (e) => {
+    if (!mousePan) return;
     e.preventDefault();
+    const dxPx = e.clientX - mousePan.startPt.x;
+    const dyPx = e.clientY - mousePan.startPt.y;
+    const { ux, uy } = svgUnitsPerPx();
+    view.x = mousePan.startView.x - dxPx * ux;
+    view.y = mousePan.startView.y - dyPx * uy;
+    updateView();
+  }, { passive: false });
+
+  svgEl.addEventListener("pointerup", () => { mousePan = null; }, { passive: false });
+  svgEl.addEventListener("pointercancel", () => { mousePan = null; }, { passive: false });
+
+  /* =========================
+     iPad: touch pan + pinch
+     (don’t preventDefault on touchstart so taps still click tiles)
+     ========================= */
+  let t0 = null;
+  // t0: { mode:"pan"|"pinch", startView, p1, startDist, startMidSvg }
+
+  function getTouches(e) {
+    return Array.from(e.touches).map(t => ({ id: t.identifier, x: t.clientX, y: t.clientY }));
+  }
+
+  svgEl.addEventListener("touchstart", (e) => {
+    const ts = getTouches(e);
+    if (ts.length === 1) {
+      t0 = { mode: "pan", startView: { ...view }, p1: ts[0], moved: false };
+    } else if (ts.length === 2) {
+      const m = mid(ts[0], ts[1]);
+      const d = dist(ts[0], ts[1]);
+      t0 = { mode: "pinch", startView: { ...view }, startDist: d, startMidSvg: clientToSvg(m.x, m.y) };
+    }
+  }, { passive: true });
+
+  svgEl.addEventListener("touchmove", (e) => {
     if (!t0) return;
     const ts = getTouches(e);
+
+    // once we’re actually panning/zooming, stop page from handling it
+    e.preventDefault();
 
     if (t0.mode === "pan" && ts.length === 1) {
       const dxPx = ts[0].x - t0.p1.x;
       const dyPx = ts[0].y - t0.p1.y;
-      if (Math.hypot(dxPx, dyPx) > 6) blockClicks(300);
+
+      if (Math.hypot(dxPx, dyPx) > 6) {
+        blockClicks(350);
+      }
 
       const { ux, uy } = svgUnitsPerPx();
       view.x = t0.startView.x - dxPx * ux;
@@ -357,7 +292,8 @@ export function createDungeonTracker(opts){
     }
 
     if (t0.mode === "pinch" && ts.length === 2) {
-      blockClicks(400);
+      blockClicks(450);
+
       const m = mid(ts[0], ts[1]);
       const d = dist(ts[0], ts[1]);
 
@@ -377,16 +313,12 @@ export function createDungeonTracker(opts){
   }, { passive: false });
 
   svgEl.addEventListener("touchend", (e) => {
-    e.preventDefault();
     const ts = getTouches(e);
     if (ts.length === 0) t0 = null;
-    if (ts.length === 1) t0 = { mode: "pan", startView: { ...view }, p1: ts[0] };
-  }, { passive: false });
+    if (ts.length === 1) t0 = { mode: "pan", startView: { ...view }, p1: ts[0], moved: false };
+  }, { passive: true });
 
-  svgEl.addEventListener("touchcancel", (e) => {
-    e.preventDefault();
-    t0 = null;
-  }, { passive: false });
+  svgEl.addEventListener("touchcancel", () => { t0 = null; }, { passive: true });
 
   function rectForKey(k){ return grid.rectByKey.get(k) || null; }
 
