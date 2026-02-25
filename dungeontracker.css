@@ -1,4 +1,4 @@
-/* dungeontracker styles v2026-02-23-01 */
+/* dungeontracker styles v2026-02-24-01 */
 :root{
   --panelW: 360px;
   --line: rgba(255,255,255,0.55);
@@ -48,8 +48,8 @@ input, textarea, select{
   padding:8px;
   border:1px solid rgba(255,255,255,0.15);
   border-radius:10px;
-  background: rgba(255,255,255,0.06);
-  color:#fff;
+  background: rgb(231, 197, 113);
+  color:#636362;
   font-size:16px;
 }
 textarea{ height:170px; resize:vertical; }

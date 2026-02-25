@@ -1,4 +1,4 @@
-// dungeontracker.js v2026-02-24-03
+// dungeontracker.js v2026-02-24-04
 // A self-contained "DungeonTracker" you can mount into an existing page.
 // - Left side: SVG 50x50 square grid.
 // - Right side: panel to edit either a cell OR a room.
@@ -45,6 +45,14 @@ export function createDungeonTracker(opts){
   // data.cells["c,r"] = { c: "#hex", n: "notes", icon:"", roomId: "abc" | null }
   // data.rooms[roomId] = { id, name, kind, c, n, icon, cells: ["c,r", ...] }
   const data = load() || { cells:{}, rooms:{}, meta:{ nextRoomId: 1 } };
+
+  const ROOM_KIND_COLORS = {
+    basic: "#3c6270", // your current default blue
+    hall: "#c9c9c9",
+    stairs: "#ffd54a",
+    secret: "#7a4bc2",
+    boss: "#b02a2a"
+  };
 
   function save(){ localStorage.setItem(storageKey, JSON.stringify(data)); }
   function load(){
@@ -411,6 +419,13 @@ export function createDungeonTracker(opts){
   function selectCell(k, rect){
     selectedCellKey = k;
 
+    if (selectedRect) {
+      const cPrev = Number(selectedRect.dataset.c);
+      const rPrev = Number(selectedRect.dataset.r);
+      setVisual(selectedRect, cPrev, rPrev);
+      setSelected(selectedRect, false);
+    }
+    
     if (selectedRect) setSelected(selectedRect, false);
     selectedRect = rect;
 
@@ -663,10 +678,26 @@ export function createDungeonTracker(opts){
     selectedEl.textContent = `Room: ${room.name} (${room.cells.length} tiles)`;
   }
 
-  function applyRoomKind(kind){
+  function applyRoomKind(kind) {
     const room = getCurrentRoom();
     if (!room) return;
-    room.kind = kind || "room";
+
+    room.kind = kind || "basic";
+
+    // OVERRIDE color based on type
+    const newColor = ROOM_KIND_COLORS[room.kind] || "#3c6270";
+    room.c = newColor;
+
+    // repaint all tiles in the room immediately
+    for (const k of room.cells) {
+      const [c, r] = k.split(",").map(Number);
+      const rect = rectForKey(k);
+      if (rect) setVisual(rect, c, r);
+    }
+
+    // update color picker to reflect new value
+    colorEl.value = newColor;
+
     save();
     renderRoomList();
   }
