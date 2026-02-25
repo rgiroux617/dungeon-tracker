@@ -44,8 +44,8 @@ export function buildSquareSvgGrid({
   makeIconText = true   // create <text> nodes and attach rect._cellIcon
 }){
   const { w, h } = computeBounds();
-  svg.setAttribute("width", w);
-  svg.setAttribute("height", h);
+  // svg.setAttribute("width", w);
+  // svg.setAttribute("height", h);
   svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
 
   svg.innerHTML = "";
