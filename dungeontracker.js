@@ -413,6 +413,10 @@ export function createDungeonTracker(opts){
 
     if (selectedRect) setSelected(selectedRect, false);
     selectedRect = rect;
+
+    // Ensure any hover-fade is cleared when selecting
+    const [c0, r0] = k.split(",").map(Number);
+    setVisual(selectedRect, c0, r0);
     setSelected(selectedRect, true);
 
     // default edit target: if cell belongs to a room, open room edit; else cell edit
