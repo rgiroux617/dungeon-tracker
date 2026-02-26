@@ -1,4 +1,4 @@
-// dungeontracker.js v2026-02-25-02
+// dungeontracker.js v2026-02-25-03
 // A self-contained "DungeonTracker" you can mount into an existing page.
 // - Left side: SVG 50x50 square grid.
 // - Right side: panel to edit either a cell OR a room.
@@ -38,6 +38,13 @@ export function createDungeonTracker(opts){
     importFileEl,
     wipeBtn,
     roomListEl,
+
+    dungeonNameEl,
+    allNotesBtn,
+    allNotesModalEl,
+    allNotesCloseBtn,
+    allNotesListEl,
+
     exitBtn
   } = panelEls;
 
@@ -71,6 +78,25 @@ export function createDungeonTracker(opts){
     if (cell.roomId === undefined) cell.roomId = null;
     return cell;
   }
+
+  function openAllNotesModal() {
+    const rooms = Object.values(data.rooms).sort((a, b) => a.id.localeCompare(b.id));
+    allNotesListEl.innerHTML = rooms.length
+      ? rooms.map(r => `
+        <div class="noteItem">
+          <div class="name">${escapeHtml(r.name || r.id)}</div>
+          <div class="text">${escapeHtml(r.n || "(no notes)")}</div>
+        </div>
+      `).join("")
+      : `<div class="small">No rooms yet.</div>`;
+    allNotesModalEl.hidden = false;
+  }
+
+  function closeAllNotesModal() { allNotesModalEl.hidden = true; }
+
+  allNotesBtn.addEventListener("click", openAllNotesModal);
+  allNotesCloseBtn.addEventListener("click", closeAllNotesModal);
+  allNotesModalEl.addEventListener("click", (e) => { if (e.target === allNotesModalEl) closeAllNotesModal(); });
 
   function roomById(id){ return id ? data.rooms[id] : null; }
 
@@ -603,7 +629,7 @@ export function createDungeonTracker(opts){
     if (!selectedCellKey || !selectedRect) return;
 
     // IMPORTANT: cell-only, never touch rooms
-    editTarget = "cell";
+    // editTarget = "cell";
 
     const cell = getCurrentCell();
     if (!cell) return;

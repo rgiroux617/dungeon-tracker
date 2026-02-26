@@ -1,11 +1,11 @@
-<!-- dungeontracker version 2-24-01 -->
+<!-- dungeontracker version 2-25-01 -->
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1, user-scalable=no" />
   <title>DungeonTracker Demo (50x50)</title>
-  <link rel="stylesheet" href="./dungeontracker.css?v=2026-02-24-05" />
+  <link rel="stylesheet" href="./dungeontracker.css?v=2026-02-24-06" />
 </head>
 <body>
   <div id="app">
@@ -28,7 +28,10 @@
       <div class="hr"></div>
 
       <label>Dungeon name</label>
-      <input id="dtDungeonName" type="text" placeholder="Tomb of the Piss-Baby" />      
+      <div class="row2">
+        <input id="dtDungeonName" type="text" placeholder="Tomb of the Piss-Baby" />
+        <button id="dtAllNotesBtn" type="button" class="miniBtn">Notes</button>
+      </div>
       
       <label>Room name</label>
       <input id="dtRoomName" type="text" placeholder="(auto)" />
@@ -82,7 +85,19 @@
       <div class="small">Rooms</div>
       <div id="dtRoomList"></div>
     </div>
+
+    <div id="dtAllNotesModal" class="modal" hidden>
+      <div class="modalCard">
+        <div class="modalHeader">
+          <div class="modalTitle">Room Notes</div>
+          <button id="dtAllNotesClose" type="button" class="miniBtn">Close</button>
+        </div>
+        <div id="dtAllNotesList" class="modalBody"></div>
+      </div>
+    </div>
   </div>
+
+
 
 <script type="module">
   import { createDungeonTracker } from "./dungeontracker.js?v=2026-02-24-06";
@@ -108,6 +123,11 @@
       importFileEl: document.getElementById("dtImportFile"),
       wipeBtn: document.getElementById("dtWipe"),
       roomListEl: document.getElementById("dtRoomList"),
+      dungeonNameEl: document.getElementById("dtDungeonName"),
+      allNotesBtn: document.getElementById("dtAllNotesBtn"),
+      allNotesModalEl: document.getElementById("dtAllNotesModal"),
+      allNotesCloseBtn: document.getElementById("dtAllNotesClose"),
+      allNotesListEl: document.getElementById("dtAllNotesList"),
       exitBtn: null
     };
 

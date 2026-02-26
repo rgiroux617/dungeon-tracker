@@ -1,4 +1,4 @@
-/* dungeontracker styles v2026-02-25-01 */
+/* dungeontracker styles v2026-02-25-02 */
 :root{
   --panelW: 360px;
   --line: rgba(255,255,255,0.55);
@@ -20,6 +20,75 @@ html, body{ height:100%; margin:0; font-family: system-ui, -apple-system, Segoe 
 #mapViewport{ width:100%; height:100%; overflow:hidden; }
 #dungeonGrid{ width:100%; height:100%; }
 
+.row2{ display:flex; gap:10px; align-items:center; }
+.row2 > input{ flex:1; }
+.miniBtn{ margin:0; padding:8px 10px; border-radius:10px; }
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.modalCard {
+  width: min(860px, 94vw);
+  max-height: 88vh;
+  overflow: auto;
+  background: #1a1611;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  padding: 12px;
+}
+
+.modalCard {
+  color: #f2efe7;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.modalTitle {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.noteItem {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.noteItem .name {
+  font-weight: 600;
+}
+
+.noteItem .text {
+  margin-top: 6px;
+  white-space: pre-wrap;
+  opacity: 0.92;
+  font-size: 14px;
+}
+
+.modal[hidden] {
+  display: none !important;
+}
 
 /* On iPad/phones, prevent the left pane from scrolling while panning the map */
 @media (hover: none) and (pointer: coarse) {
