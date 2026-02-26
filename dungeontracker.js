@@ -1,4 +1,4 @@
-// dungeontracker.js v2026-02-24-04
+// dungeontracker.js v2026-02-25-02
 // A self-contained "DungeonTracker" you can mount into an existing page.
 // - Left side: SVG 50x50 square grid.
 // - Right side: panel to edit either a cell OR a room.
@@ -24,8 +24,8 @@ export function createDungeonTracker(opts){
     titleEl,
     modeEl,
     selectedEl,
-    colorEl,
-    iconEl,
+    cellMarksEl,
+    cellColorEl,
     notesEl,
     roomNameEl,
     roomKindEl,
@@ -64,9 +64,10 @@ export function createDungeonTracker(opts){
 
   function ensureCell(c, r){
     const k = key(c, r);
-    data.cells[k] ??= { c: null, n: "", icon: "", roomId: null };
+    data.cells[k] ??= { c: null, n: "", icon: "", iconOverride: null, roomId: null };
     const cell = data.cells[k];
     if (cell.icon === undefined) cell.icon = "";
+    if (cell.iconOverride === undefined) cell.iconOverride = null; // null = inherit room, "" = force blank
     if (cell.roomId === undefined) cell.roomId = null;
     return cell;
   }
@@ -135,7 +136,9 @@ export function createDungeonTracker(opts){
     rect.setAttribute("stroke-width", "1");
 
     // icon: prefer room icon if in room, else cell icon
-    const icon = (room?.icon) || cell.icon || "";
+    const icon = (cell.iconOverride !== null)
+      ? cell.iconOverride          // "" allowed (forces blank)
+      : ((room?.icon) || "");      // inherit room icon only when override is null
     if (rect._cellIcon){
       rect._cellIcon.textContent = icon;
       rect._cellIcon.style.display = icon ? "block" : "none";
@@ -447,17 +450,14 @@ export function createDungeonTracker(opts){
 
     // populate fields
     if (editTarget === "cell"){
-      colorEl.value = cell.c || "#2a2a2a";
-      iconEl.value  = cell.icon || "";
+      cellColorEl.value = cell.c || "#3c6270";
       notesEl.value = cell.n || "";
       roomNameEl.value = "";
-      roomKindEl.value = "room";
+      roomKindEl.value = "basic";
     } else {
-      colorEl.value = room.c || "#2a2a2a";
-      iconEl.value  = room.icon || "";
       notesEl.value = room.n || "";
       roomNameEl.value = room.name || "";
-      roomKindEl.value = room.kind || "room";
+      roomKindEl.value = room.kind || "basic";
     }
 
     refreshButtons();
@@ -520,7 +520,7 @@ export function createDungeonTracker(opts){
     const room = {
       id,
       name: `Room ${id}`,
-      kind: "room",
+      kind: "basic",
       c: "#3c6270",
       n: "",
       icon: "",
@@ -597,6 +597,25 @@ export function createDungeonTracker(opts){
     const cell = getCurrentCell();
     if (!cell?.roomId) return null;
     return roomById(cell.roomId);
+  }
+
+  function applyCellMark({ icon = null, color = null }) {
+    if (!selectedCellKey || !selectedRect) return;
+
+    // IMPORTANT: cell-only, never touch rooms
+    editTarget = "cell";
+
+    const cell = getCurrentCell();
+    if (!cell) return;
+
+    if (icon !== null) cell.iconOverride = icon;
+    if (color !== null) cell.c = color;
+
+    const [c, r] = selectedCellKey.split(",").map(Number);
+    setVisual(selectedRect, c, r);
+    setSelected(selectedRect, true);
+
+    save();
   }
 
   // --- panel bindings ---
@@ -695,9 +714,6 @@ export function createDungeonTracker(opts){
       if (rect) setVisual(rect, c, r);
     }
 
-    // update color picker to reflect new value
-    colorEl.value = newColor;
-
     save();
     renderRoomList();
   }
@@ -707,15 +723,20 @@ export function createDungeonTracker(opts){
     const cell = getCurrentCell();
     if (!cell) return;
 
-    // if part of a room, don't clear the room through the cell button
-    if (cell.roomId){
-      alert("This tile is part of a room. Edit the room, dissolve it, or delete it.");
+    // If in a room, only clear the per-cell mark overlays (not the room itself)
+    if (cell.roomId) {
+      cell.c = null;
+      cell.iconOverride = null; // back to inheriting room icon
+      save();
+      const [c, r] = selectedCellKey.split(",").map(Number);
+      setVisual(selectedRect, c, r);
+      setSelected(selectedRect, true);
       return;
     }
 
     cell.c = null;
     cell.icon = "";
-    cell.n = "";
+    // cell.n = "";
     save();
 
     const [c, r] = selectedCellKey.split(",").map(Number);
@@ -751,11 +772,9 @@ export function createDungeonTracker(opts){
         editTarget = "room";
         modeEl.textContent = "Editing: Room";
         selectedEl.textContent = `Room: ${room.name} (${room.cells.length} tiles)`;
-        colorEl.value = room.c || "#2a2a2a";
-        iconEl.value  = room.icon || "";
         notesEl.value = room.n || "";
         roomNameEl.value = room.name || "";
-        roomKindEl.value = room.kind || "room";
+        roomKindEl.value = room.kind || "basic";
         refreshButtons();
       });
       roomListEl.appendChild(div);
@@ -838,7 +857,7 @@ export function createDungeonTracker(opts){
     selectedEl.textContent = "Click a tile…";
     notesEl.value = "";
     roomNameEl.value = "";
-    roomKindEl.value = "room";
+    roomKindEl.value = "basic";
     refreshButtons();
     renderRoomList();
   }
@@ -858,7 +877,7 @@ export function createDungeonTracker(opts){
     selectedEl.textContent = "Click a tile…";
     notesEl.value = "";
     roomNameEl.value = "";
-    roomKindEl.value = "room";
+    roomKindEl.value = "basic";
     refreshButtons();
     renderRoomList();
   }
@@ -875,8 +894,17 @@ export function createDungeonTracker(opts){
   }
 
   // --- wire panel events ---
-  colorEl.addEventListener("input", () => applyColor(colorEl.value));
-  iconEl.addEventListener("input", () => applyIcon(iconEl.value));
+  cellMarksEl.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-icon]");
+    if (!btn) return;
+    applyCellMark({ icon: btn.dataset.icon });
+  });
+
+  cellColorEl.addEventListener("input", () => {
+    applyCellMark({ color: cellColorEl.value });
+  });
+
+
   notesEl.addEventListener("input", () => applyNotes(notesEl.value));
 
   roomNameEl.addEventListener("input", () => applyRoomName(roomNameEl.value));
@@ -939,9 +967,8 @@ export function createDungeonTracker(opts){
         modeEl.textContent = "Editing: Cell";
         selectedEl.textContent = selectedCellKey ? `Cell: ${selectedCellKey}` : "Click a tile…";
         const cell = getCurrentCell();
-        if (cell){
-          colorEl.value = cell.c || "#2a2a2a";
-          iconEl.value  = cell.icon || "";
+        if (cell) {
+          cellColorEl.value = cell.c || "#3c6270";
           notesEl.value = cell.n || "";
         }
         refreshButtons();

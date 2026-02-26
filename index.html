@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1, user-scalable=no" />
   <title>DungeonTracker Demo (50x50)</title>
-  <link rel="stylesheet" href="./dungeontracker.css?v=2026-02-24-03" />
+  <link rel="stylesheet" href="./dungeontracker.css?v=2026-02-24-05" />
 </head>
 <body>
   <div id="app">
@@ -18,32 +18,21 @@
     </div>
 
     <div id="panel">
-      <h1 id="dtTitle">DungeonTracker</h1>
-      <div class="small">
+      <h1 id="dtTitle">Dungeon Buddy</h1>
+      <!-- <div class="small">
         Click a tile to edit it.<br/>
         Stage tiles with <kbd>Shift</kbd>+Click, then <kbd>Enter</kbd> or "Create Room".<br/>
         Rooms must be edge-contiguous.
-      </div>
+      </div> -->
 
       <div class="hr"></div>
 
-      <div class="chip" id="dtMode">Editing: Cell</div>
-      <div class="chip" id="dtSelected">Click a tile…</div>
-
-      <label>Color</label>
-      <input id="dtColor" type="color" value="#2a2a2a" />
-
-      <label>Icon (single char / emoji)</label>
-      <input id="dtIcon" type="text" maxlength="2" placeholder="e.g. ⚔︎" />
-
-      <label>Notes</label>
-      <textarea id="dtNotes" placeholder="What’s here? Doors, traps, factions…"></textarea>
-
-      <div class="hr"></div>
-
+      <label>Dungeon name</label>
+      <input id="dtDungeonName" type="text" placeholder="Tomb of the Piss-Baby" />      
+      
       <label>Room name</label>
       <input id="dtRoomName" type="text" placeholder="(auto)" />
-
+      
       <label>Room kind</label>
       <select id="dtRoomKind">
         <option value="basic">Basic</option>
@@ -52,6 +41,24 @@
         <option value="secret">Secret</option>
         <option value="boss">Boss</option>
       </select>
+
+      <div class="chip" id="dtMode">Editing: Cell</div>
+      <div class="chip" id="dtSelected">Click a tile…</div>
+
+      <label>Cell marks</label>
+      <div class="markRow" id="dtCellMarks">
+        <button type="button" class="markBtn" data-icon="E">E</button>
+        <button type="button" class="markBtn" data-icon="T">T</button>
+        <button type="button" class="markBtn" data-icon="C">C</button>
+        <button type="button" class="markBtn" data-icon="*">*</button>
+        <button type="button" class="markBtn" data-icon="?">?</button>
+        <input id="dtCellColor" class="markColor" type="color" value="#3c6270" title="Cell color" />
+      </div>
+
+      <label>Notes</label>
+      <textarea id="dtNotes" placeholder="What’s here? Doors, traps, factions…"></textarea>
+
+      <div class="hr"></div>
 
       <div class="row">
         <button id="dtCreateRoom" type="button">Create Room</button>
@@ -78,7 +85,7 @@
   </div>
 
 <script type="module">
-  import { createDungeonTracker } from "./dungeontracker.js?v=2026-02-24-04";
+  import { createDungeonTracker } from "./dungeontracker.js?v=2026-02-24-06";
 
   window.addEventListener("DOMContentLoaded", () => {
     const svgEl = document.getElementById("dungeonGrid");
@@ -87,8 +94,8 @@
       titleEl: document.getElementById("dtTitle"),
       modeEl: document.getElementById("dtMode"),
       selectedEl: document.getElementById("dtSelected"),
-      colorEl: document.getElementById("dtColor"),
-      iconEl: document.getElementById("dtIcon"),
+      cellMarksEl: document.getElementById("dtCellMarks"),
+      cellColorEl: document.getElementById("dtCellColor"),
       notesEl: document.getElementById("dtNotes"),
       roomNameEl: document.getElementById("dtRoomName"),
       roomKindEl: document.getElementById("dtRoomKind"),
