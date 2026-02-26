@@ -1,4 +1,4 @@
-// dungeontracker.js v2026-02-25-03
+// dungeontracker.js v2026-02-26-01
 // A self-contained "DungeonTracker" you can mount into an existing page.
 // - Left side: SVG 50x50 square grid.
 // - Right side: panel to edit either a cell OR a room.
@@ -94,9 +94,24 @@ export function createDungeonTracker(opts){
 
   function closeAllNotesModal() { allNotesModalEl.hidden = true; }
 
-  allNotesBtn.addEventListener("click", openAllNotesModal);
-  allNotesCloseBtn.addEventListener("click", closeAllNotesModal);
-  allNotesModalEl.addEventListener("click", (e) => { if (e.target === allNotesModalEl) closeAllNotesModal(); });
+  function wireTap(el, fn) {
+    if (!el) return;
+    el.addEventListener("click", fn);                 // desktop
+    el.addEventListener("pointerup", (e) => {         // iPad / touch
+      if (e.pointerType !== "mouse") fn(e);
+    });
+    el.addEventListener("touchend", fn, { passive: true }); // extra iOS safety
+  }
+
+  wireTap(allNotesBtn, openAllNotesModal);
+  wireTap(allNotesCloseBtn, closeAllNotesModal);
+
+  allNotesModalEl.addEventListener("click", (e) => {
+    if (e.target === allNotesModalEl) closeAllNotesModal();
+  });
+  allNotesModalEl.addEventListener("touchend", (e) => {
+    if (e.target === allNotesModalEl) closeAllNotesModal();
+  }, { passive: true });
 
   function roomById(id){ return id ? data.rooms[id] : null; }
 
